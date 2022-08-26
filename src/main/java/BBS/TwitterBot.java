@@ -1,6 +1,10 @@
 package BBS;
 
 
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import outputWriter.JavaWriter;
 import twitter4j.*;
 import twitter4j.api.SavedSearchesResources;
 import twitter4j.conf.ConfigurationBuilder;
@@ -26,10 +30,17 @@ public class TwitterBot implements Runnable{
     private String subSearchQuery;
     private Query subQuery;
     public List<String> filters = new ArrayList<>();
-    private int tweetsForPage = 1;
-    private String lang = null;
+    private int tweetsForPage = 2;
+    private int repliesForPage=20;
+    private String mainLang = null;
+    private String subLang = null;
     private Query.ResultType typeOfResult = null;
     private Date sinceDate = null;
+    private Twitter twitter;
+    private List<SavedSearch> savedSearches = null;
+    private int maxSavedSearches = 15;
+    List<TweetForExcel> tweetForExcels = new ArrayList<>();
+    private String filename;
 
     public TwitterBot(){
     }
@@ -62,7 +73,6 @@ public class TwitterBot implements Runnable{
             System.out.println("FileNotFoundException per il file twitter4j.properties");
             e.printStackTrace();
         }
-
         cb.setDebugEnabled(true)
                 .setOAuthConsumerKey(consumerKey)
                 .setOAuthConsumerSecret(consumerSecret)
@@ -101,18 +111,70 @@ public class TwitterBot implements Runnable{
     public void setSearchQuery(String searchQuery){
         this.mainSearchQuery=searchQuery;
     }
+    public Query getMainQuery() {
+        return mainQuery;
+    }
+    public void setMainQuery(Query mainQuery) {
+        this.mainQuery = mainQuery;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public List<SavedSearch> getSavedSearches() {
+        return savedSearches;
+    }
+
+    public void setSavedSearches(List<SavedSearch> savedSearches) {
+        this.savedSearches = savedSearches;
+    }
+
+    public int getMaxSavedSearches() {
+        return maxSavedSearches;
+    }
+
+    public void setMaxSavedSearches(int maxSavedSearches) {
+        this.maxSavedSearches = maxSavedSearches;
+    }
+
+    public String getMainSearchQuery() {
+        return mainSearchQuery;
+    }
+
+    public int getRepliesForPage() {
+        return repliesForPage;
+    }
+
+    public void setRepliesForPage(int repliesForPage) {
+        this.repliesForPage = repliesForPage;
+    }
+
     public int getTweetsForPage() {
         return tweetsForPage;
     }
     public void setTweetsForPage(int tweetsForPage) {
         this.tweetsForPage = tweetsForPage;
     }
-    public String getLang() {
-        return lang;
+    public String getMainLang() {
+        return mainLang;
     }
-    public void setLang(String lang) {
-        this.lang = lang;
+    public void setMainLang(String lang) {
+        this.mainLang = lang;
     }
+
+    public String getSubLang() {
+        return subLang;
+    }
+
+    public void setSubLang(String subLang) {
+        this.subLang = subLang;
+    }
+
     public Query.ResultType getTypeOfResult() {
         return typeOfResult;
     }
@@ -126,11 +188,56 @@ public class TwitterBot implements Runnable{
         }
         return tweets;
     }
-    public String getSavedSearchesResources(Twitter twitter) throws TwitterException {
-        SavedSearchesResources s = twitter.savedSearches();
 
-        SavedSearch savedSearch = s.showSavedSearch(twitter.getId());
-        return savedSearch.getQuery();
+    public void getandsaveSavedSearches()  {
+        try {
+            savedSearches = this.twitter.getSavedSearches();
+        } catch (TwitterException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void destroySavedSearches(){
+        try {
+            savedSearches = this.twitter.getSavedSearches();
+        } catch (TwitterException e) {
+            e.printStackTrace();
+        }
+        if(savedSearches.size()>0) {
+            for (SavedSearch s : savedSearches) {
+                try {
+                    twitter.destroySavedSearch(s.getId());
+
+                } catch (TwitterException e) {
+                    e.printStackTrace();
+                }
+            }
+        }else{
+            System.out.println("no saved search saved..\n");
+        }
+        savedSearches = null;
+    }
+
+    public void removeSavedSearch(){
+        if(this.savedSearches.size()>0) {
+            this.savedSearches.remove(1);
+        }
+    }
+
+    public void cleanSavedSearches(){
+        if(this.savedSearches.size()>this.getMaxSavedSearches()){
+            while(savedSearches.size()<=this.getMaxSavedSearches())
+                this.savedSearches.remove(1);
+        }
+    }
+
+    public void createSavedSearch(Query query){
+        try {
+            SavedSearch savedSearch = twitter.createSavedSearch(query.toString());
+        } catch (TwitterException e) {
+            e.printStackTrace();
+            System.out.println("Failed to create a saved search: " + e.getMessage());
+        }
     }
 
     public Date getSinceDate() {
@@ -172,18 +279,20 @@ public class TwitterBot implements Runnable{
         this.mainQuery.setCount(this.getTweetsForPage());
         if(this.getTypeOfResult()!=null)
             this.mainQuery.setResultType(this.getTypeOfResult());
-        if(this.getLang()!=null)
-            this.mainQuery.setLang(this.getLang());
-        if(this.getSinceDate() != null)
-            this.mainQuery.setSince(this.sinceDate.toString());
+        if(this.getMainLang()!=null)
+            this.mainQuery.setLang(this.getMainLang());
+        if(this.getSinceDate() != null) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+            this.mainQuery.setSince(dateFormat.format(this.getSinceDate()));
+        }
     }
 
     public void subQuerySettings(){
         if(this.getTypeOfResult()!=null)
             this.subQuery.setResultType(this.getTypeOfResult());
-        if(this.getLang()!=null)
-            this.subQuery.setLang(this.getLang());
-        this.subQuery.setCount(this.getTweetsForPage());
+        if(this.getSubLang()!=null)
+            this.subQuery.setLang(this.getSubLang());
+        this.subQuery.setCount(this.getRepliesForPage());
     }
 
     public void addOrStatement(String statement){
@@ -271,11 +380,12 @@ public class TwitterBot implements Runnable{
         }
     }
 
+
     @Override
     public void run() {
         this.configurate();
         TwitterFactory tf = new TwitterFactory(cb.build());
-        Twitter twitter = tf.getInstance();
+        this.twitter = tf.getInstance();
         QueryResult result;
         try {
             this.mainQuery=new Query();
@@ -284,20 +394,14 @@ public class TwitterBot implements Runnable{
             this.setQuery(this.mainSearchQuery);
             int pageNumber=1;
             do {
-                System.out.println("Pagina numero: "+ pageNumber);
                 System.out.println("Query di ricerca di riferimento: "+ this.mainSearchQuery+"\n");
-                result = twitter.search(mainQuery); //search restituisce l'insieme di pagine contenenti tweet filtrati da query
+                result = twitter.search(mainQuery);                                     //search restituisce l'insieme di pagine contenenti tweet filtrati da query
                 List<Tweet> tweetList = getTweetsFromResult(result);
                 System.out.println("tweet trovati: " + tweetList.size());
+
                 for (Tweet mainTweet : tweetList) {
-                    System.out.println("@" + mainTweet.getUser().getScreenName() + "\n" + mainTweet.getText());
-                    System.out.println("Data di creazione : " + mainTweet.getCreatedAt());
-                    System.out.println("NUMERO DI MI PIACE : " + mainTweet.getLikes());
-                    System.out.println("LINGUA: " + mainTweet.getLanguage());
-                    System.out.println("RETWEET: " + mainTweet.isRetweet());
-                    System.out.println("MENZIONATI: "+mainTweet.getMentioned());
-                    System.out.println("Tweet ID: "+mainTweet.getTweetId());
-                    System.out.println("Conversation ID: "+mainTweet.getConversationId());
+                    TweetForExcel tweetForExcel = new TweetForExcel(mainTweet.getText(),mainTweet.getLinkToTweet());
+                    tweetForExcel.setNumberOfReplies(0);
                     this.subQuery = new Query();
                     subQuerySettings();
                     if(mainTweet.getConversationId()>0){
@@ -306,23 +410,23 @@ public class TwitterBot implements Runnable{
                         setSubQuery("conversation_id:" + mainTweet.getTweetId());
                     }
                     int subPage=1;
+                    List<String> replies = new ArrayList<>();
                     do {
                         QueryResult subResult = twitter.search(subQuery);
                         List<Tweet> subTweets = getTweetsFromResult(subResult);
-                        System.out.println("        :::replies:::");
                         for (Tweet subTweet : subTweets) {
-                            System.out.println("@" + subTweet.getUser().getScreenName() + "\n" + subTweet.getText());
-                            System.out.println("Data di creazione : " + subTweet.getCreatedAt());
-                            System.out.println("NUMERO DI MI PIACE : " + subTweet.getLikes());
-                            System.out.println("LINGUA: " + subTweet.getLanguage());
-                            System.out.println("CONVERSATION ID: " + subTweet.getConversationId());
-                            System.out.println("\n");
+                            replies.add(subTweet.getText());
                         }
                         subPage++;
                     }while((subQuery = result.nextQuery()) != null && subPage <=  MAX_PAGES);
+                    tweetForExcel.setNumberOfReplies(replies.size());
+                    tweetForExcels.add(tweetForExcel);
                 }
                 pageNumber++;
             } while((mainQuery = result.nextQuery()) != null && pageNumber <=  MAX_PAGES);
+
+            JavaWriter javaWriter = new JavaWriter(new String[]{"Foglio 1" , "Testi"});
+            javaWriter.writerFromTweets(tweetForExcels,"prova");
         } catch (TwitterException e) {
             e.printStackTrace();
         }

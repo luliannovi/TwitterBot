@@ -1,5 +1,6 @@
 package BBS;
 
+import twitter4j.GeoLocation;
 import twitter4j.Place;
 import twitter4j.Status;
 import twitter4j.UserMentionEntity;
@@ -20,6 +21,8 @@ public class Tweet {
     private String source;
     private TwitterUser[] usersMentioned;
     private Place place;
+    private GeoLocation geoLocation;
+    private String linkToTweet;
 
     public Tweet(TwitterUser user, String text, Date createdAt, boolean isRetweet) {
         this.user = user;
@@ -51,6 +54,9 @@ public class Tweet {
         this.isPossiblySensitive = status.isPossiblySensitive();
         this.isRetweet = status.isRetweet();
         this.usersMentioned = getMentionedList(status.getUserMentionEntities());
+        this.place = status.getPlace();
+        this.geoLocation = status.getGeoLocation();
+        this.linkToTweet="https://twitter.com/" + status.getUser().getScreenName() + "/status/" + status.getId();
     }
 
     public TwitterUser[] getMentionedList(UserMentionEntity[] users){
@@ -70,6 +76,30 @@ public class Tweet {
             returnString = returnString + "\n--> @" + user.getScreenName() + "\n";
         }
         return returnString;
+    }
+
+    public String getLinkToTweet() {
+        return linkToTweet;
+    }
+
+    public void setLinkToTweet(String linkToTweet) {
+        this.linkToTweet = linkToTweet;
+    }
+
+    public Place getPlace() {
+        return place;
+    }
+
+    public void setPlace(Place place) {
+        this.place = place;
+    }
+
+    public GeoLocation getGeoLocation() {
+        return geoLocation;
+    }
+
+    public void setGeoLocation(GeoLocation geoLocation) {
+        this.geoLocation = geoLocation;
     }
 
     public long getConversationId() {

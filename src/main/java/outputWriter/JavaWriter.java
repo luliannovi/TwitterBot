@@ -1,5 +1,6 @@
 package outputWriter;
 
+import BBS.TweetForExcel;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -9,6 +10,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 public class JavaWriter {
     private short headerBackgroundColor = IndexedColors.GREEN.getIndex();
@@ -36,9 +38,13 @@ public class JavaWriter {
     private Row[] rows;
     //CONSTRUCTORS
 
-    public JavaWriter(String mainSheetName) {
+    public JavaWriter(String[] sheets) {
         this.mainWorkbook = new XSSFWorkbook();
-        this.mainSheet = this.mainWorkbook.createSheet(mainSheetName);
+        if(sheets.length > 0) {
+            for(String name : sheets)
+                this.mainWorkbook.createSheet(name);
+        }
+        this.mainSheet = this.mainWorkbook.getSheet("Testi");
         this.header=mainSheet.createRow(0);
         this.headerStyle=mainWorkbook.createCellStyle();
         this.headerFont=mainWorkbook.createFont();
@@ -138,7 +144,7 @@ public class JavaWriter {
             this.columnsName=new String[this.numberOfColumns];
         if(this.columnsWidth == null)
             this.columnsWidth= new int[this.numberOfColumns];
-        this.headerStyle.setFillBackgroundColor(headerBackgroundColor);
+        this.headerStyle.setFillForegroundColor(headerBackgroundColor);
         this.headerStyle.setFillPattern(headerFillPatternType);
         this.headerStyle.setAlignment(headerAlignment);
         this.headerFont.setFontName(headerFontName);
@@ -150,7 +156,7 @@ public class JavaWriter {
             headerCell=this.header.createCell(i);
             headerCell.setCellValue(this.columnsName[i]);
             headerCell.setCellStyle(headerStyle);
-            mainSheet.setColumnWidth(i,15000);
+            mainSheet.setColumnWidth(1,15000);
         }
     }
 
@@ -170,12 +176,41 @@ public class JavaWriter {
     }
     public void fillWithData(String[][] data){
         this.arrayData=data;
-        for(int i=0;i<this.numberOfRows;i++){
-            for(int k=0;k<this.numberOfColumns;k++){
+        for(int i=0;i<this.arrayData.length;i++){
+            for(int k=0;k<this.arrayData[i].length;k++){
                 this.dataCells[i][k].setCellValue(data[i][k]);
             }
         }
     }
+
+    public void writerFromTweets(List<TweetForExcel> tweetForExcels,String filename){
+        int rowsForReplies=0;
+        for(TweetForExcel t : tweetForExcels)
+            rowsForReplies += t.getNumberOfReplies();
+        setNumberOfRows(rowsForReplies + tweetForExcels.size());
+        setNumberOfColumns(5);
+        setColumnsName(new String[]{"LINK", "TESTI", "PORZIONI DI TESTO" , "REPERTORI" , "CONTENUTI"});
+        setHeaderBackgroundColor(IndexedColors.GREY_50_PERCENT.getIndex());
+        setHeaderFillPatternType(FillPatternType.SOLID_FOREGROUND);
+        setHeaderAlignment(HorizontalAlignment.CENTER);
+        headerSettings();
+        dataCellsSettings();
+        int row = 2;
+        for(TweetForExcel t : tweetForExcels){
+            this.dataCells[row][2].setCellValue(t.getTweet());
+            this.dataCells[row][1].setCellValue(t.getLinkToTweet());
+            CellStyle c = this.dataCellStyle;
+            c.setFillForegroundColor(IndexedColors.BLUE.getIndex());
+            this.dataCells[row][2].setCellStyle(c);
+            for(String tw : t.getReplies()){
+                row++;
+                this.dataCells[row][2].setCellValue(tw);
+            }
+            row++;
+        }
+        writeInFile(filename);
+    }
+
     public void writeInFile(String filename){
         File currDir = new File(".");
         String path = currDir.getAbsolutePath();
